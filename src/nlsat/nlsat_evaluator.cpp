@@ -33,6 +33,40 @@ namespace nlsat {
         scoped_anum_vector       m_add_roots_tmp;
         scoped_anum_vector       m_inf_tmp;
         
+        bool get_floor(atom* a, anum const& v, anum& r) {
+            if (!m_solver.is_int(a->max_var()) || m_am.is_int(v))
+                return false;
+
+            m_am.int_lt(v, r);
+            
+            scoped_anum t(m_am);
+            m_am.add(r, 1, t);
+            
+            if (m_am.gt(t, v)) {
+			    std::cout << "get_floor: " << t << std::endl;
+                return true;
+			}
+
+            return false;
+        }
+
+        bool get_ceil(atom* a, anum const& v, anum& r) {
+            if (!m_solver.is_int(a->max_var())||m_am.is_int(v))
+                return false;
+
+            m_am.int_gt(v, r);
+            
+            scoped_anum t(m_am);
+            m_am.add(r, -1, t);
+
+            if (m_am.lt(t, v)){
+                   std::cout << "get_ceil: " << t << std::endl;
+                   return true;
+            }
+
+            return false;
+        }
+
         // sign tables: light version
         struct sign_table {
             anum_manager &     m_am;
@@ -632,10 +666,24 @@ namespace nlsat {
                     }
                     break;
                 case atom::ROOT_LT:
-                    if (neg)
-                        result = m_ism.mk(true, true, dummy, true, false, r_i, jst, cls); // (-oo, r_i)
-                    else
-                        result = m_ism.mk(false, false, r_i, true, true, dummy, jst, cls); // [r_i, oo)
+                    if (neg){
+                        scoped_anum t(m_am);
+                        if (get_floor(a, r_i, t)) {
+                            result = m_ism.mk(true, true, dummy, true, false, t, jst, cls); // (-oo, floor(r_i))
+                        }
+                        else {
+                            result = m_ism.mk(true, true, dummy, true, false, r_i, jst, cls); // (-oo, r_i)
+                        }
+                    }
+                    else {
+                        scoped_anum t(m_am);
+                        if (get_ceil(a, r_i, t)) {
+                            result = m_ism.mk(false, false, t, true, true, dummy, jst, cls); // [ceil(r_i), oo)
+                        }
+                        else {
+                            result = m_ism.mk(false, false, r_i, true, true, dummy, jst, cls); // [r_i, oo)
+                        }
+                    }
                     break;
                 case atom::ROOT_GT:
                     if (neg) 
@@ -650,10 +698,25 @@ namespace nlsat {
                         result = m_ism.mk(true, false, r_i, true, true, dummy, jst, cls); // (r_i, oo)
                     break;
                 case atom::ROOT_GE:
-                    if (neg) 
-                        result = m_ism.mk(false, false, r_i, true, true, dummy, jst, cls); // [r_i, oo)
-                    else
-                        result = m_ism.mk(true, true, dummy, true, false, r_i, jst, cls); // (-oo, r_i)
+                    if (neg) {
+                        scoped_anum t(m_am);
+                        if (this->get_ceil(a, r_i, t)) {
+                            result = m_ism.mk(false, false, t, true, true, dummy, jst, cls); // [ceil(r_i), oo)
+                        }
+                        else {
+                            result = m_ism.mk(false, false, r_i, true, true, dummy, jst, cls); // [r_i, oo)
+                        }
+                    }
+                    else {
+                        scoped_anum t(m_am);
+                        if (this->get_floor(a, r_i, t)) {
+                            result = m_ism.mk(true, true, dummy, true, false, t, jst, cls); //  (-oo, floor(r_i))
+                        }
+                        else {
+                            result = m_ism.mk(true, true, dummy, true, false, r_i, jst, cls); // (-oo, r_i) 
+                        }
+                        
+                    }
                     break;
                 default:
                     UNREACHABLE();
@@ -667,6 +730,7 @@ namespace nlsat {
         interval_set_ref infeasible_intervals(atom * a,  bool neg, clause const* cls) {
             return a->is_ineq_atom() ? infeasible_intervals(to_ineq_atom(a), neg, cls) : infeasible_intervals(to_root_atom(a), neg, cls); 
         }
+
     };
     
     evaluator::evaluator(solver& s, assignment const & x2v, pmanager & pm, small_object_allocator & allocator) {
