@@ -34,7 +34,6 @@ namespace nlsat {
         scoped_anum_vector       m_inf_tmp;
         
         bool get_floor(atom* a, anum const& v, anum& r) {
-            return false;
             if (!m_solver.is_int(a->max_var()) || m_am.is_int(v))
                 return false;
 
@@ -52,7 +51,6 @@ namespace nlsat {
         }
 
         bool get_ceil(atom* a, anum const& v, anum& r) {
-            return false;
             if (!m_solver.is_int(a->max_var())||m_am.is_int(v))
                 return false;
 
