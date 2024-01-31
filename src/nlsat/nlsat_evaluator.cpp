@@ -34,6 +34,7 @@ namespace nlsat {
         scoped_anum_vector       m_inf_tmp;
         
         bool get_floor(atom* a, anum const& v, anum& r) {
+            return false;
             if (!m_solver.is_int(a->max_var()) || m_am.is_int(v))
                 return false;
 
@@ -51,6 +52,7 @@ namespace nlsat {
         }
 
         bool get_ceil(atom* a, anum const& v, anum& r) {
+            return false;
             if (!m_solver.is_int(a->max_var())||m_am.is_int(v))
                 return false;
 
@@ -640,7 +642,13 @@ namespace nlsat {
             // even when the maximal variable is assigned. I need this feature to minimize conflict cores.
             m_am.isolate_roots(polynomial_ref(a->p(), m_pm), undef_var_assignment(m_assignment, x), roots);
             interval_set_ref result(m_ism);
-
+            scoped_anum t(m_am);
+            auto floor = [&](const anum& r_i) {
+                return get_floor(a, r_i, t)? t: r_i;
+            };
+            auto ceil = [&](const anum& r_i) {
+                return get_ceil(a, r_i, t)? t: r_i;
+            };
             if (i > roots.size()) {
                 // p does have sufficient roots
                 // atom is false by definition
@@ -666,57 +674,29 @@ namespace nlsat {
                     }
                     break;
                 case atom::ROOT_LT:
-                    if (neg){
-                        scoped_anum t(m_am);
-                        if (get_floor(a, r_i, t)) {
-                            result = m_ism.mk(true, true, dummy, true, false, t, jst, cls); // (-oo, floor(r_i))
-                        }
-                        else {
-                            result = m_ism.mk(true, true, dummy, true, false, r_i, jst, cls); // (-oo, r_i)
-                        }
-                    }
-                    else {
-                        scoped_anum t(m_am);
-                        if (get_ceil(a, r_i, t)) {
-                            result = m_ism.mk(false, false, t, true, true, dummy, jst, cls); // [ceil(r_i), oo)
-                        }
-                        else {
-                            result = m_ism.mk(false, false, r_i, true, true, dummy, jst, cls); // [r_i, oo)
-                        }
-                    }
+                    if (neg)
+                        result = m_ism.mk(true, true, dummy, true, false, floor(r_i), jst, cls); // (-oo, r_i)
+                    else
+                        result = m_ism.mk(false, false, ceil(r_i), true, true, dummy, jst, cls); // [r_i, oo)
                     break;
                 case atom::ROOT_GT:
                     if (neg) 
-                        result = m_ism.mk(true, false, r_i, true, true, dummy, jst, cls); // (r_i, oo)
+                        result = m_ism.mk(true, false, ceil(r_i), true, true, dummy, jst, cls); // (r_i, oo)
                     else
-                        result = m_ism.mk(true, true, dummy, false, false, r_i, jst, cls); // (-oo, r_i]
+                        result = m_ism.mk(true, true, dummy, false, false, floor(r_i), jst, cls); // (-oo, r_i]
                     break;
                 case atom::ROOT_LE:
                     if (neg)
-                        result = m_ism.mk(true, true, dummy, false, false, r_i, jst, cls); // (-oo, r_i]
+                        result = m_ism.mk(true, true, dummy, false, false, floor(r_i), jst, cls); // (-oo, r_i]
                     else
-                        result = m_ism.mk(true, false, r_i, true, true, dummy, jst, cls); // (r_i, oo)
+                        result = m_ism.mk(true, false, ceil(r_i), true, true, dummy, jst, cls); // (r_i, oo)
                     break;
                 case atom::ROOT_GE:
-                    if (neg) {
-                        scoped_anum t(m_am);
-                        if (this->get_ceil(a, r_i, t)) {
-                            result = m_ism.mk(false, false, t, true, true, dummy, jst, cls); // [ceil(r_i), oo)
-                        }
-                        else {
-                            result = m_ism.mk(false, false, r_i, true, true, dummy, jst, cls); // [r_i, oo)
-                        }
-                    }
-                    else {
-                        scoped_anum t(m_am);
-                        if (this->get_floor(a, r_i, t)) {
-                            result = m_ism.mk(true, true, dummy, true, false, t, jst, cls); //  (-oo, floor(r_i))
-                        }
-                        else {
-                            result = m_ism.mk(true, true, dummy, true, false, r_i, jst, cls); // (-oo, r_i) 
-                        }
-                        
-                    }
+                    if (neg)
+                        result = m_ism.mk(false, false, ceil(r_i), true, true, dummy, jst, cls); // [r_i, oo)
+                    else
+                        result = m_ism.mk(true, true, dummy, true, false, floor(r_i), jst, cls); // (-oo, r_i) 
+                    
                     break;
                 default:
                     UNREACHABLE();
