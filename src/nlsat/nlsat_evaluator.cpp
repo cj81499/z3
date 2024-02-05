@@ -36,16 +36,17 @@ namespace nlsat {
         bool get_floor(atom* a, anum const& v, anum& r) {
             if (!m_solver.is_int(a->max_var()) || m_am.is_int(v))
                 return false;
-
+            TRACE("algebraic", tout << "v: as root = "; m_am.display_root(tout, v) << ", as interval="; m_am.display_interval(tout, v) << std::endl;);
             m_am.int_lt(v, r);
-            
+            m_am.add(r, 1, r);
+            TRACE("algebraic", tout << "r = int_lt:"; m_am.display_root(tout, r) <<", as interval="; m_am.display_interval(tout, r) << std::endl;);
             scoped_anum t(m_am);
-            m_am.add(r, 1, t);
-            
-            if (m_am.gt(t, v)) {
-			    std::cout << "get_floor: " << t << std::endl;
+            TRACE("algebraic", tout << "t = r+1:"; m_am.display_root(tout, t) <<", as interval="; m_am.display_interval(tout, t) << std::endl;);
+            if (m_am.lt(r, v) && m_am.lt(v, t)) {
+			    //std::cout << "get_floor: " << t << std::endl;
                 return true;
 			}
+            TRACE("algebraic", tout << "t is not greater than v" << std::endl;);
 
             return false;
         }
@@ -55,13 +56,12 @@ namespace nlsat {
                 return false;
 
             m_am.int_gt(v, r);
-            
+            m_am.add(r, -1, r);            
             scoped_anum t(m_am);
             m_am.add(r, -1, t);
 
-            if (m_am.lt(t, v)){
-                   std::cout << "get_ceil: " << t << std::endl;
-                   return true;
+            if (m_am.lt(t, v) && m_am.lt(v, r)){
+                return true;
             }
 
             return false;
